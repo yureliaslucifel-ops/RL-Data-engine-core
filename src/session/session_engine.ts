@@ -10,7 +10,7 @@ export class SessionEngine {
     const data = event.data as { MatchGuid?: string; WinnerTeamNum?: number };
 
     if (data.MatchGuid && data.MatchGuid !== this.session.matchGuid) {
-      this.startSession(data.MatchGuid, event.timestamp);
+      this.startSession(data.MatchGuid, event.timestamp, event.accountId);
     }
 
     if (event.type === "GoalScored") {
@@ -31,12 +31,13 @@ export class SessionEngine {
     };
   }
 
-  private startSession(matchGuid: string, timestamp: number): void {
+  private startSession(matchGuid: string, timestamp: number, accountId?: string): void {
     this.session = {
       matchGuid,
       startedAt: timestamp,
       goalCount: 0,
-      goals: []
+      goals: [],
+      accountId
     };
   }
 }
