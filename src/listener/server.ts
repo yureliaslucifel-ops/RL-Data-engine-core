@@ -1,5 +1,5 @@
 import express from 'express';
-import bodyParser from 'body-parser';
+
 import WALStore, { ApplyUpdateFn } from '../storage/wal-store';
 
 const PORT = Number(process.env.LISTENER_PORT || 3000);
@@ -7,7 +7,7 @@ const HOST = process.env.LISTENER_HOST || '0.0.0.0'; // bind to all interfaces f
 
 async function main() {
   const app = express();
-  app.use(bodyParser.json());
+  app.use(express.json());
 
   const store = new WALStore({ dir: './data' });
   await store.init();
