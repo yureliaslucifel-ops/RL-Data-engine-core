@@ -139,6 +139,7 @@ export interface AccountStats {
   assists?: number;
   saves?: number;
   shots?: number;
+  mvpCount?: number;
   // aggregated by mode/season can be added later
 }
 
