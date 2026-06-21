@@ -71,7 +71,7 @@ rlStatsApi.on("connect", ({ url }) => {
 
 rlStatsApi.on("disconnect", () => {
   stateEngine.setRocketLeagueConnection(false);
-  logger.warn("Disconnected from RL Stats API");
+logger.info("Disconnected from RL Stats API");
 });
 
 rlStatsApi.on("error", (error) => {
