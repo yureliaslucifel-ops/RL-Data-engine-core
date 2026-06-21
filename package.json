@@ -1,0 +1,38 @@
+{
+  "name": "rl-data-engine-core",
+  "version": "1.0.0",
+  "description": "Rocket League real-time data backbone for dual-PC overlays",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "nodemon --watch src --exec ts-node src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "watch": "ts-node-dev --respawn src/index.ts",
+    "test": "jest",
+    "lint": "eslint ."
+  },
+  "keywords": [
+    "rocketleague",
+    "realtime",
+    "websocket",
+    "stats",
+    "streaming",
+    "dual-pc"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.0.0",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.0",
+    "jest": "^29.0.0",
+    "nodemon": "^3.0.0",
+    "ts-node": "^10.9.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "sqlite3": "^5.1.0",
+    "ws": "^8.0.0"
+  }
+}
