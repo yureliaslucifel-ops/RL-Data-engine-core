@@ -9,6 +9,8 @@ export interface EngineEvent<TData = unknown> {
   type: string;
   timestamp: number;
   data: TData;
+  // optional account id (new) - present if the message includes account identification
+  accountId?: string;
 }
 
 export interface PlayerState {
@@ -75,11 +77,13 @@ export interface GoalScoredPayload {
     Name: string;
     Shortcut?: number;
     TeamNum: number;
+    PrimaryId?: string;
   };
   Assister?: {
     Name: string;
     Shortcut?: number;
-    TeamNum: number;
+    TeamNum?: number;
+    PrimaryId?: string;
   };
 }
 
@@ -98,6 +102,51 @@ export interface SessionState {
   endedAt?: number;
   goalCount: number;
   goals: EngineEvent<GoalScoredPayload>[];
+  // optional account id attached to this session
+  accountId?: string;
+}
+
+/**
+ * Added: match and account/season stats types
+ */
+export interface PlayerMatchStats {
+  name: string;
+  primaryId?: string;
+  teamNum: number;
+  goals: number;
+  assists: number;
+  saves: number;
+  shots: number;
+  touches?: number;
+  demos?: number;
+  score?: number;
+}
+
+export interface MatchStats {
+  matchGuid?: string;
+  score?: { [teamNum: number]: number };
+  durationSeconds?: number;
+  goalsTotal?: number;
+  players: PlayerMatchStats[];
+  startedAt?: number;
+  endedAt?: number;
+}
+
+export interface AccountStats {
+  accountId: string;
+  matchesPlayed?: number;
+  goals?: number;
+  assists?: number;
+  saves?: number;
+  shots?: number;
+  // aggregated by mode/season can be added later
+}
+
+export interface Season {
+  seasonId: string;
+  seasonName?: string;
+  start?: number;
+  end?: number;
 }
 
 export interface OverlaySnapshot {
@@ -105,6 +154,11 @@ export interface OverlaySnapshot {
   timestamp: number;
   state: MatchState;
   session: SessionState;
+  // new optional fields, kept optional to maintain compatibility
+  matchStats?: MatchStats;
+  accountStats?: AccountStats[]; // per account
+  season?: Season | null;
+  seasonStats?: { [seasonId: string]: AccountStats } | null;
 }
 
 export interface OverlayEventMessage {
@@ -122,4 +176,6 @@ export interface StoredMatchEvent {
   timestamp: number;
   priority: EventPriority;
   payload: unknown;
+  accountId?: string;
+  seasonId?: string;
 }
