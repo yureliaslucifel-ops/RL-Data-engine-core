@@ -1,5 +1,5 @@
 import { EventEmitter } from "events";
-import WebSocket from "ws";
+import net from "net";
 import { EngineEvent, RocketLeagueMessage } from "../types";
 import { accountManager } from "../accounts/account_manager";
 
@@ -10,7 +10,7 @@ export interface RLStatsAPIOptions {
 }
 
 export class RLStatsAPI extends EventEmitter {
-  private socket: WebSocket | null = null;
+  private socket: net.Socket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private shouldReconnect = false;
 
@@ -40,22 +40,32 @@ export class RLStatsAPI extends EventEmitter {
     }
 
     if (this.socket) {
-      this.socket.close();
+      this.socket.destroy();
       this.socket = null;
     }
   }
 
   private open(): void {
-    const url = `ws://${this.host}:${this.port}`;
-    this.socket = new WebSocket(url);
+    this.socket = new net.Socket();
 
-    this.socket.on("open", () => {
-      this.emit("connect", { url });
+    this.socket.connect(this.port, this.host, () => {
+      this.emit("connect", {
+        url: `tcp://${this.host}:${this.port}`
+      });
     });
 
-    this.socket.on("message", (data) => {
-      const event = this.parse(data.toString());
-      if (event) this.emit("event", event);
+    let buffer = "";
+
+    this.socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+
+      const messages = buffer.split("\n");
+      buffer = messages.pop() || "";
+
+      for (const msg of messages) {
+        const event = this.parse(msg);
+        if (event) this.emit("event", event);
+      }
     });
 
     this.socket.on("close", () => {
@@ -89,7 +99,6 @@ export class RLStatsAPI extends EventEmitter {
         data: msg.Data
       };
 
-      // résolution account simple
       const players = (msg.Data as any)?.Players;
 
       if (Array.isArray(players)) {
