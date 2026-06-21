@@ -3,17 +3,27 @@ import WebSocket from "ws";
 import { EngineEvent, RocketLeagueMessage } from "../types";
 import { accountManager } from "../accounts/account_manager";
 
+export interface RLStatsAPIOptions {
+  host?: string;
+  port?: number;
+  reconnectDelayMs?: number;
+}
+
 export class RLStatsAPI extends EventEmitter {
   private socket: WebSocket | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private shouldReconnect = false;
 
-  constructor(
-    private readonly host = "127.0.0.1",
-    private readonly port = 49123,
-    private readonly reconnectDelayMs = 3000
-  ) {
+  private host: string;
+  private port: number;
+  private reconnectDelayMs: number;
+
+  constructor(options: RLStatsAPIOptions = {}) {
     super();
+
+    this.host = options.host ?? "127.0.0.1";
+    this.port = options.port ?? 49123;
+    this.reconnectDelayMs = options.reconnectDelayMs ?? 3000;
   }
 
   connect(): void {
@@ -23,8 +33,16 @@ export class RLStatsAPI extends EventEmitter {
 
   close(): void {
     this.shouldReconnect = false;
-    if (this.socket) this.socket.close();
-    this.socket = null;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.socket) {
+      this.socket.close();
+      this.socket = null;
+    }
   }
 
   private open(): void {
@@ -71,8 +89,9 @@ export class RLStatsAPI extends EventEmitter {
         data: msg.Data
       };
 
-      // simple account resolution (safe)
+      // résolution account simple
       const players = (msg.Data as any)?.Players;
+
       if (Array.isArray(players)) {
         for (const p of players) {
           if (p?.PrimaryId) {
