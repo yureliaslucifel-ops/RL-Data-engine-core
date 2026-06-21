@@ -1,5 +1,6 @@
 import { EngineEvent, EventPriority, OverlaySnapshot, StoredMatchEvent } from "../types";
 import { SQLiteStorage } from "./sqlite/sqlite_storage";
+import { AccountStats } from "../types";
 
 export class StorageEngine {
   private ready = false;
@@ -36,6 +37,16 @@ export class StorageEngine {
 
     this.storage.insertSnapshot(snapshot).catch((error) => {
       console.error("[RL DATA ENGINE] Failed to persist snapshot", error);
+    });
+  }
+
+  // <-- Méthode correctement positionnée (au même niveau que les autres méthodes)
+  updateAccountStats(deltas: AccountStats[], seasonId?: string): void {
+    if (!this.ready) return;
+    if (!deltas || !deltas.length) return;
+
+    this.storage.upsertAccountStats(deltas, seasonId).catch((error) => {
+      console.error("[RL DATA ENGINE] Failed to update account_stats", error);
     });
   }
 
