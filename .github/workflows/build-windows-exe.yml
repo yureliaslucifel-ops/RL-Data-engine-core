@@ -18,9 +18,9 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Install dependencies
+      - name: Install dependencies (try ci, fallback to install)
         run: |
-          npm ci
+          npm ci || npm install --no-audit --no-fund
 
       - name: Build (if applicable)
         run: |
