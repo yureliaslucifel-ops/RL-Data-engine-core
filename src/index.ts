@@ -49,7 +49,7 @@ const snapshotBuilder = new SnapshotBuilder(
 // WAL STORAGE (NEW)
 // =====================
 const walStore = new WALStore({
-  dir: "./data"
+  dir: "H:\\data"
 });
 
 const storageEngine = new StorageEngine(walStore);
