@@ -1,0 +1,49 @@
+name: Build Windows executable
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows-exe:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+
+      - name: Build (if applicable)
+        run: |
+          npm run build || echo "no build script"
+
+      - name: Install pkg
+        run: |
+          npm i -g pkg
+
+      - name: Create exe with pkg
+        shell: powershell
+        run: |
+          Write-Host "Looking for entry point..."
+          if (Test-Path dist\index.js) { $entry = 'dist\\index.js' } elseif (Test-Path lib\index.js) { $entry = 'lib\\index.js' } elseif (Test-Path src\index.js) { $entry = 'src\\index.js' } else { Write-Error 'Entry point not found (dist/index.js or src/index.js). Ensure build produces JS output.'; exit 1 }
+          Write-Host "Using entry: $entry"
+          pkg $entry --targets node18-win-x64 --output rl-data-engine.exe
+
+      - name: Package exe to zip
+        run: |
+          Compress-Archive -Path rl-data-engine.exe -DestinationPath rl-data-engine-windows-x64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rl-data-engine-windows-x64
+          path: rl-data-engine-windows-x64.zip
