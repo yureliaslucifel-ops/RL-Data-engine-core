@@ -1,6 +1,7 @@
 import { EventEmitter } from "events";
 import WebSocket from "ws";
 import { EngineEvent, RocketLeagueMessage } from "../types";
+import { accountManager } from "../accounts/account_manager";
 
 export interface RLStatsAPIOptions {
   host?: string;
@@ -88,11 +89,87 @@ export class RLStatsAPI extends EventEmitter {
         return null;
       }
 
-      return {
+      const data = normalizeData(message.Data);
+      const event: EngineEvent = {
         type: message.Event,
         timestamp: Date.now(),
-        data: normalizeData(message.Data)
+        data
       };
+
+      // attempt to resolve accountId from payload
+      try {
+        // players array
+        const maybePlayers = (data as any)?.Players;
+        if (Array.isArray(maybePlayers)) {
+          for (const p of maybePlayers) {
+            if (p && p.PrimaryId) {
+              const entry = accountManager.findByPrimaryId(p.PrimaryId);
+              if (entry) {
+                event.accountId = entry.accountId;
+                break;
+              }
+            }
+            if (p && p.Name && !event.accountId) {
+              // fallback by name
+              const byName = accountManager.list().find((e: any) => e.name === p.Name || e.displayName === p.Name);
+              if (byName) {
+                event.accountId = byName.accountId;
+                // if primaryId found later we will enrich config automatically
+                break;
+              }
+            }
+          }
+        }
+
+        // scorer/assister/target
+        const attemptFromField = (obj: any) => {
+          if (!obj) return undefined;
+          if (obj.PrimaryId) {
+            const e = accountManager.findByPrimaryId(obj.PrimaryId);
+            if (e) return e.accountId;
+          }
+          if (obj.Name) {
+            const e = accountManager.list().find((x: any) => x.name === obj.Name || x.displayName === obj.Name);
+            if (e) return e.accountId;
+          }
+          return undefined;
+        };
+
+        const scorer = (data as any)?.Scorer;
+        if (scorer && !event.accountId) {
+          const a = attemptFromField(scorer);
+          if (a) event.accountId = a;
+        }
+
+        const assister = (data as any)?.Assister;
+        if (assister && !event.accountId) {
+          const a = attemptFromField(assister);
+          if (a) event.accountId = a;
+        }
+
+        const target = (data as any)?.Target || (data as any)?.MainTarget;
+        if (target && !event.accountId) {
+          const a = attemptFromField(target);
+          if (a) event.accountId = a;
+        }
+
+        // if we found a mapping by name but PrimaryId exists in payload, enrich config
+        if (!event.accountId && Array.isArray(maybePlayers)) {
+          for (const p of maybePlayers) {
+            if (!p) continue;
+            const byName = accountManager.list().find((e: any) => e.name === p.Name || e.displayName === p.Name);
+            if (byName && p.PrimaryId) {
+              // enrich and save
+              (byName as any).primaryId = p.PrimaryId;
+              accountManager.add(byName).catch(() => {});
+            }
+          }
+        }
+      } catch (e) {
+        // ignore account resolution errors
+      }
+
+      return event;
     } catch {
       return null;
     }
