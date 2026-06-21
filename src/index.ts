@@ -5,14 +5,14 @@ import { EventBus } from "./core/event_bus";
 import { PriorityRouter } from "./core/priority_router";
 import { SessionEngine } from "./session/session_engine";
 import { StateEngine } from "./state/state_engine";
-import { StorageEngine } from "./storage/storage_engine";
-import { SQLiteStorage } from "./storage/sqlite/sqlite_storage";
 import { SnapshotBuilder } from "./websocket/snapshot_builder";
 import { startWebSocketServer } from "./websocket/ws_server";
 import { logger } from "./utils/logger";
 import { SeasonManager } from "./season/season_manager";
 import { accountManager } from "./accounts/account_manager";
 import { AccountStats } from "./types";
+import WALStore from "./storage/wal-store";
+import { StorageEngine } from "./storage/storage_engine";
 
 const config = loadConfig();
 
@@ -28,7 +28,11 @@ const matchCollector = new MatchCollector();
 const priorityRouter = new PriorityRouter();
 const seasonManager = new SeasonManager();
 const snapshotBuilder = new SnapshotBuilder(stateEngine, sessionEngine, seasonManager);
-const storageEngine = new StorageEngine(new SQLiteStorage(config.databasePath));
+const walStore = new WALStore({
+  dir: "./data"
+});
+
+const storageEngine = new StorageEngine(walStore);
 
 rlStatsApi.on("connect", ({ url }) => {
   stateEngine.setRocketLeagueConnection(true);
