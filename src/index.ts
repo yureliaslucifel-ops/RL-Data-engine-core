@@ -11,29 +11,53 @@ import { logger } from "./utils/logger";
 import { SeasonManager } from "./season/season_manager";
 import { accountManager } from "./accounts/account_manager";
 import { AccountStats } from "./types";
+
 import WALStore from "./storage/wal-store";
 import { StorageEngine } from "./storage/storage_engine";
 
 const config = loadConfig();
 
+
+// =====================
+// RL STATS API
+// =====================
 const rlStatsApi = new RLStatsAPI({
   host: config.rlStatsHost,
-  port: config.rlStatsPort
+  port: config.rlStatsPort,
+  reconnectDelayMs: 3000
 });
 
+
+// =====================
+// CORE SYSTEMS
+// =====================
 const eventBus = new EventBus();
 const stateEngine = new StateEngine();
 const sessionEngine = new SessionEngine();
 const matchCollector = new MatchCollector();
 const priorityRouter = new PriorityRouter();
 const seasonManager = new SeasonManager();
-const snapshotBuilder = new SnapshotBuilder(stateEngine, sessionEngine, seasonManager);
+
+const snapshotBuilder = new SnapshotBuilder(
+  stateEngine,
+  sessionEngine,
+  seasonManager
+);
+
+
+// =====================
+// WAL STORAGE (NEW)
+// =====================
 const walStore = new WALStore({
   dir: "./data"
 });
 
 const storageEngine = new StorageEngine(walStore);
 
+
+// =====================
+// RL API EVENTS
+// =====================
 rlStatsApi.on("connect", ({ url }) => {
   stateEngine.setRocketLeagueConnection(true);
   logger.info(`Connected to Rocket League Stats API at ${url}`);
@@ -48,6 +72,10 @@ rlStatsApi.on("error", (error) => {
   logger.error("Rocket League Stats API error", error);
 });
 
+
+// =====================
+// MAIN EVENT PIPELINE
+// =====================
 rlStatsApi.on("event", (event) => {
   const routed = priorityRouter.route(event);
 
@@ -67,24 +95,41 @@ rlStatsApi.on("event", (event) => {
     storageEngine.persistEvent(routed.event, routed.priority);
   }
 
-  if (routed.event.type === "MatchEnded" || routed.event.type === "MatchDestroyed") {
+  // =====================
+  // MATCH END PROCESSING
+  // =====================
+  if (
+    routed.event.type === "MatchEnded" ||
+    routed.event.type === "MatchDestroyed"
+  ) {
     const snapshot = snapshotBuilder.buildFullSnapshot();
 
     // determine winning team
     let winningTeamNum: number | undefined;
+
     const scoreMap = snapshot.matchStats?.score;
     if (scoreMap) {
-      const entries = Object.entries(scoreMap).map(([k, v]) => ({ teamNum: Number(k), score: v }));
+      const entries = Object.entries(scoreMap).map(([k, v]) => ({
+        teamNum: Number(k),
+        score: v
+      }));
+
       entries.sort((a, b) => b.score - a.score);
+
       if (entries.length > 0) {
         winningTeamNum = entries[0].teamNum;
       }
     }
 
-    // compute MVP(s): highest score within winning team
+    // compute MVP
     const players = snapshot.matchStats?.players || [];
-    const winningPlayers = typeof winningTeamNum === "number" ? players.filter((p) => p.teamNum === winningTeamNum) : [];
+    const winningPlayers =
+      typeof winningTeamNum === "number"
+        ? players.filter((p) => p.teamNum === winningTeamNum)
+        : [];
+
     let maxScore = Number.NEGATIVE_INFINITY;
+
     for (const p of winningPlayers) {
       if (typeof p.score === "number" && p.score > maxScore) {
         maxScore = p.score;
@@ -94,11 +139,18 @@ rlStatsApi.on("event", (event) => {
     const deltas: AccountStats[] = [];
 
     for (const p of players) {
-      // map player to account
-      const entry = p.primaryId ? accountManager.findByPrimaryId(p.primaryId) : accountManager.list().find((e: any) => e.name === p.name || e.displayName === p.name);
+      const entry = p.primaryId
+        ? accountManager.findByPrimaryId(p.primaryId)
+        : accountManager.list().find(
+            (e: any) => e.name === p.name || e.displayName === p.name
+          );
+
       if (!entry) continue;
 
-      const isMvp = typeof maxScore === "number" && p.teamNum === winningTeamNum && p.score === maxScore;
+      const isMvp =
+        typeof maxScore === "number" &&
+        p.teamNum === winningTeamNum &&
+        p.score === maxScore;
 
       deltas.push({
         accountId: entry.accountId,
@@ -112,9 +164,9 @@ rlStatsApi.on("event", (event) => {
     }
 
     const seasonId = seasonManager.getCurrentSeason()?.seasonId;
+
     if (deltas.length) {
-      // StorageEngine type in this codebase may not declare updateAccountStats on all variants; cast to any to avoid TS build errors
-      (storageEngine as any).updateAccountStats(deltas, seasonId);
+      (storageEngine as any).updateAccountStats?.(deltas, seasonId);
     }
 
     storageEngine.persistSnapshot(snapshot);
@@ -125,12 +177,16 @@ rlStatsApi.on("event", (event) => {
   }
 });
 
+
+// =====================
+// BOOTSTRAP
+// =====================
 async function bootstrap(): Promise<void> {
   try {
     await storageEngine.init();
-    logger.info(`Storage database ready at ${config.databasePath}`);
+    logger.info(`Storage ready at ./data (WAL mode)`);
   } catch (error) {
-    logger.error("Storage disabled because SQLite failed to initialize", error);
+    logger.error("Storage failed to initialize", error);
   }
 
   startWebSocketServer({
@@ -143,7 +199,9 @@ async function bootstrap(): Promise<void> {
 
   rlStatsApi.connect();
 
-  logger.info(`Overlay WebSocket listening on ws://${config.overlayHost}:${config.overlayPort}`);
+  logger.info(
+    `Overlay WebSocket listening on ws://${config.overlayHost}:${config.overlayPort}`
+  );
 }
 
 bootstrap().catch((error) => {
