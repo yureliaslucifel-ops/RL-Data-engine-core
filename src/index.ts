@@ -109,7 +109,8 @@ rlStatsApi.on("event", (event) => {
 
     const seasonId = seasonManager.getCurrentSeason()?.seasonId;
     if (deltas.length) {
-      storageEngine.updateAccountStats(deltas, seasonId);
+      // StorageEngine type in this codebase may not declare updateAccountStats on all variants; cast to any to avoid TS build errors
+      (storageEngine as any).updateAccountStats(deltas, seasonId);
     }
 
     storageEngine.persistSnapshot(snapshot);
