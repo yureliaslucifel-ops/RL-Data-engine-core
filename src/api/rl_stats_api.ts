@@ -87,35 +87,46 @@ export class RLStatsAPI extends EventEmitter {
     }, this.reconnectDelayMs);
   }
 
-  private parse(raw: string): EngineEvent | null {
-    try {
-      const msg = JSON.parse(raw) as RocketLeagueMessage;
+private parse(raw: string): EngineEvent | null {
+  try {
+    const msg = JSON.parse(raw) as RocketLeagueMessage;
 
-      if (!msg.Event) return null;
+    if (!msg.Event) return null;
 
-      const event: EngineEvent = {
-        type: msg.Event,
-        timestamp: Date.now(),
-        data: msg.Data
-      };
+    let data = msg.Data;
 
-      const players = (msg.Data as any)?.Players;
+    // 🔥 FIX IMPORTANT: double JSON encoding support
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        data = {};
+      }
+    }
 
-      if (Array.isArray(players)) {
-        for (const p of players) {
-          if (p?.PrimaryId) {
-            const acc = accountManager.findByPrimaryId(p.PrimaryId);
-            if (acc) {
-              event.accountId = acc.accountId;
-              break;
-            }
+    const event: EngineEvent = {
+      type: msg.Event,
+      timestamp: Date.now(),
+      data
+    };
+
+    const players = (data as any)?.Players;
+
+    if (Array.isArray(players)) {
+      for (const p of players) {
+        if (p?.PrimaryId) {
+          const acc = accountManager.findByPrimaryId(p.PrimaryId);
+          if (acc) {
+            event.accountId = acc.accountId;
+            break;
           }
         }
       }
-
-      return event;
-    } catch {
-      return null;
     }
+
+    return event;
+  } catch {
+    return null;
   }
+}
 }
